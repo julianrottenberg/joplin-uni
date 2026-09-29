@@ -1,0 +1,25 @@
+{
+	"name": "joplin-plugin-uni",
+	"version": "1.0.0",
+	"description": "Set up and organise Joplin for university: semester wizard, courses, reading lists, deadlines and a dashboard — all inside one notebook.",
+	"scripts": {
+		"dist": "webpack --env joplin-plugin-config=buildMain && webpack --env joplin-plugin-config=buildExtraScripts && webpack --env joplin-plugin-config=createArchive",
+		"updateVersion": "webpack --env joplin-plugin-config=updateVersion"
+	},
+	"license": "MIT",
+	"keywords": [
+		"joplin-plugin"
+	],
+	"devDependencies": {
+		"@types/node": "^18.7.13",
+		"chalk": "^4.1.0",
+		"copy-webpack-plugin": "^11.0.0",
+		"fs-extra": "^10.1.0",
+		"glob": "^8.0.3",
+		"tar": "^6.1.11",
+		"ts-loader": "^9.3.1",
+		"typescript": "^4.8.2",
+		"webpack": "^5.74.0",
+		"webpack-cli": "^4.10.0"
+	}
+}

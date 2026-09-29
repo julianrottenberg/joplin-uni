@@ -1,0 +1,12 @@
+{
+	"manifest_version": 1,
+	"id": "io.github.julianrottenberg.uni",
+	"name": "Uni — University Workspace",
+	"description": "Set up and organise Joplin for university in one notebook: semester wizard, per-course structure, reading lists, deadlines with reminders and an auto-generated dashboard.",
+	"version": "1.0.0",
+	"author": "Julian Rottenberg",
+	"app_min_version": "3.0",
+	"platforms": ["desktop"],
+	"keywords": ["university", "semester", "courses", "syllabus", "reading list", "deadlines", "student"],
+	"categories": ["productivity", "personal knowledge management"]
+}
