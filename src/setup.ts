@@ -12,32 +12,14 @@ import { germanToIso, isValidUserDate } from './dates';
 import { showAddCourseForm, showSetupForm } from './dialogs';
 import { getUniSettings, setUniSetting, UniSettings } from './settings';
 import { getOrCreateFolder, getOrCreateNote, findUniFolder } from './uni';
+import type { CourseFields } from './uni';
 import { refreshDashboard } from './dashboard';
-
-export interface ParsedCourse {
-	name: string;
-	code: string;
-	instructor: string;
-	credits: string;
-}
-
-export function parseCourseLine(line: string): ParsedCourse | null {
-	const parts = line.split('|').map((p) => p.trim());
-	const name = parts[0];
-	if (!name) return null;
-	return {
-		name,
-		code: parts[1] ?? '',
-		instructor: parts[2] ?? '',
-		credits: parts[3] ?? '',
-	};
-}
 
 async function toast(message: string, type: ToastType = ToastType.Success): Promise<void> {
 	await joplin.views.dialogs.showToast({ message, type, duration: 4000 });
 }
 
-function courseInfoBody(course: ParsedCourse, semesterName: string): string {
+function courseInfoBody(course: CourseFields, semesterName: string): string {
 	return [
 		`# ${course.name}`,
 		'',
@@ -59,7 +41,7 @@ export function readingListBody(courseName: string, weeks: number): string {
 	const parts = [
 		`# ${courseName} — Reading List`,
 		'',
-		'Tick items as you read them — progress shows up on the Uni dashboard. Add items via the command palette (Ctrl+P, "Uni: Add reading…"), or type them directly as Markdown checkboxes.',
+		'Tick items as you read them — progress shows up on the Uni dashboard. Add items via the command palette (Ctrl+Shift+P, "Uni: Add reading…"), or type them directly as Markdown checkboxes.',
 	];
 	for (let w = 1; w <= weeks; w++) {
 		parts.push('', `## Week ${w}`);
@@ -74,7 +56,7 @@ export function readingListBody(courseName: string, weeks: number): string {
  */
 export async function createCourseStructure(
 	uniFolderId: string,
-	course: ParsedCourse,
+	course: CourseFields,
 	settings: UniSettings,
 	weeklyLectureNotes: boolean,
 ): Promise<Folder> {
@@ -144,12 +126,7 @@ export async function runSetupWizard(): Promise<void> {
 		createdNotebook = true;
 	}
 
-	const parsedCourses = form.coursesRaw
-		.split(/\r?\n/)
-		.map((l) => l.trim())
-		.filter(Boolean)
-		.map(parseCourseLine)
-		.filter((c): c is ParsedCourse => c !== null);
+	const parsedCourses = form.courses;
 
 	for (const course of parsedCourses) {
 		await createCourseStructure(uniFolder.id, course, settingsNow, form.weeklyLectureNotes);
@@ -170,7 +147,7 @@ export async function addCourse(): Promise<void> {
 	const uniFolder = await findUniFolder(settings, folders);
 	if (!uniFolder) {
 		await joplin.views.dialogs.showMessageBox(
-			`No "${settings.notebookName}" notebook found. Run Ctrl+P, then "Uni: Set up semester…" first.`,
+			`No "${settings.notebookName}" notebook found. Run Ctrl+Shift+P, then "Uni: Set up semester…" first.`,
 		);
 		return;
 	}

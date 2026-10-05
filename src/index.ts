@@ -25,7 +25,7 @@ async function openDashboard(): Promise<void> {
 	const uniFolder = await findUniFolder(settings, folders);
 	if (!uniFolder) {
 		await joplin.views.dialogs.showMessageBox(
-			`No "${settings.notebookName}" notebook found. Run Ctrl+P, then **Uni: Set up semester…** to create it.`,
+			`No "${settings.notebookName}" notebook found. Run Ctrl+Shift+P, then **Uni: Set up semester…** to create it.`,
 		);
 		return;
 	}
@@ -84,7 +84,7 @@ joplin.plugins.register({
 		await registerCommands();
 
 		// No menus, no toolbar buttons, no icons: the plugin is reachable only
-		// through the command palette (Ctrl+P, "Uni: …") and Options → Uni.
+		// through the command palette (Ctrl+Shift+P, "Uni: …") and Options → Uni.
 
 		const settings = await getUniSettings();
 		if (settings.autoRefresh) {

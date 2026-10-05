@@ -33,7 +33,7 @@ Everything hangs off **Tools → Uni Workspace**:
 
 | Command | What it does |
 | --- | --- |
-| Set up semester… | Notebook + semester settings + courses (batch input) |
+| Set up semester… | Notebook + semester settings + courses (one row of fields per course) |
 | Add course… | One more course notebook |
 | New lecture note… | Lecture note in the course's Lectures notebook |
 | Add reading… | Appends an item under the right week heading |
@@ -41,11 +41,12 @@ Everything hangs off **Tools → Uni Workspace**:
 | Refresh dashboard | Rebuilds the dashboard note |
 | Open dashboard | Jump to the dashboard |
 
-Course input format: one per line, `Name | Code | Instructor | Credits` —
-only the name is required.
+Course input: one course per row, with separate fields for name, code,
+instructor and credits — only the name is required. Rows you leave empty are
+ignored.
 
 Keyboard people: every command also shows up in the command palette
-(Ctrl+P) as "Uni: …".
+(Ctrl+Shift+P) as "Uni: …".
 
 ## Notes on how it works
 

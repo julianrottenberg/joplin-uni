@@ -1,5 +1,5 @@
 import joplin from 'api';
-import type { Course } from './uni';
+import type { Course, CourseFields } from './uni';
 import { DEADLINE_TYPES, READING_PRIORITIES } from './constants';
 import { isoToGerman, todayGerman } from './dates';
 
@@ -20,7 +20,7 @@ const DIALOG_CSS = `
 	.sheet h3 { margin: 0 0 6px 0; font-size: 18px; }
 	p.hint { margin: 0 0 16px 0; color: #888; }
 	.sheet form { display: flex; flex-direction: column; }
-	.sheet.tall form { flex: 1 1 auto; min-height: 0; }
+	.sheet.tall form { flex: 1 1 auto; }
 	label { display: block; margin: 12px 0 2px 0; font-size: 13px; font-weight: 600; }
 	input[type="text"], input[type="date"], input[type="number"], textarea, select {
 		width: 100%; padding: 8px 10px; margin-top: 5px;
@@ -28,14 +28,26 @@ const DIALOG_CSS = `
 		font: inherit; color: inherit;
 	}
 	textarea { resize: vertical; }
-	textarea.grow { flex: 1 1 auto; min-height: 160px; }
 	.row { display: flex; gap: 14px; }
 	.row > label { flex: 1 1 0; min-width: 0; }
+	/* Course entry: one row of separate fields per course. */
+	.courses { display: flex; flex-direction: column; flex: 1 1 auto; margin-top: 18px; }
+	.courses-title { margin: 0 0 10px 0; font-size: 13px; font-weight: 600; }
+	.courses-title .muted { font-weight: 400; color: #888; }
+	.courses-head { display: flex; gap: 10px; padding: 0 2px; margin-bottom: 6px; font-size: 12px; font-weight: 600; color: #888; }
+	.course-rows { display: flex; flex-direction: column; justify-content: space-evenly; flex: 1 1 auto; }
+	.course-row { display: flex; gap: 10px; align-items: center; min-height: 38px; }
+	.course-row input { margin-top: 0; }
+	.num { flex: 0 0 16px; text-align: right; font-size: 12px; color: #999; }
+	.c-name { flex: 2.2 1 0; min-width: 0; }
+	.c-code { flex: 1 1 0; min-width: 0; }
+	.c-instructor { flex: 1.3 1 0; min-width: 0; }
+	.c-credits { flex: 0.9 1 0; min-width: 0; }
 	label.check { display: flex; align-items: center; gap: 10px; font-weight: 400; margin-top: 16px; cursor: pointer; }
 	label.check input { width: auto; margin: 0; }
 	@media (prefers-color-scheme: dark) {
 		input, textarea, select { border-color: #4a4a4a; }
-		p.hint { color: #999; }
+		p.hint, .courses-title .muted, .courses-head { color: #999; }
 	}
 `;
 
@@ -105,8 +117,38 @@ export interface SetupFormResult {
 	semesterName: string;
 	semesterStart: string;
 	semesterWeeks: number;
-	coursesRaw: string;
+	courses: CourseFields[];
 	weeklyLectureNotes: boolean;
+}
+
+/** Course rows shown in the setup wizard. Empty rows are ignored. */
+const COURSE_ROWS = 8;
+
+function courseFieldsHtml(): string {
+	const rows: string[] = [];
+	for (let i = 1; i <= COURSE_ROWS; i++) {
+		const example = i === 1;
+		rows.push(`
+			<div class="course-row">
+				<span class="num">${i}</span>
+				<input class="c-name" type="text" name="courseName${i}" placeholder="${example ? 'e.g. Epistemology' : ''}" aria-label="Course ${i} name">
+				<input class="c-code" type="text" name="courseCode${i}" placeholder="${example ? 'PHI-301' : ''}" aria-label="Course ${i} code">
+				<input class="c-instructor" type="text" name="courseInstructor${i}" placeholder="${example ? 'Dr. Smith' : ''}" aria-label="Course ${i} instructor">
+				<input class="c-credits" type="text" name="courseCredits${i}" placeholder="${example ? '5 ECTS' : ''}" aria-label="Course ${i} credits">
+			</div>`);
+	}
+	return `
+		<div class="courses">
+			<div class="courses-title">Courses <span class="muted">— only the name is required; leave rows you don't need empty</span></div>
+			<div class="courses-head">
+				<span class="num"></span>
+				<span class="c-name">Course name</span>
+				<span class="c-code">Code</span>
+				<span class="c-instructor">Instructor</span>
+				<span class="c-credits">Credits</span>
+			</div>
+			<div class="course-rows">${rows.join('')}</div>
+		</div>`;
 }
 
 export async function showSetupForm(defaults: {
@@ -130,15 +172,13 @@ export async function showSetupForm(defaults: {
 				<input type="number" name="semesterWeeks" min="1" max="40" value="${defaults.semesterWeeks}" required>
 			</label>
 		</div>
-		<label>Courses — one per line: Name | Code | Instructor | Credits
-			<textarea name="courses" class="grow" placeholder="Epistemology | PHI-301 | Dr. Smith | 5&#10;Linear Algebra | MATH-201 | Prof. Euler | 6"></textarea>
-		</label>
+		${courseFieldsHtml()}
 		<label class="check"><input type="checkbox" name="weeklyLectureNotes"> Create a lecture note for every week</label>
 	`;
 	const data = await openFormDialog(
 		'uni-setup',
 		'Set up your Uni workspace',
-		'Everything is created inside one notebook, so your private notes stay separate. You can add more courses later.',
+		'Everything is created inside one notebook, so your private notes stay separate. More courses can be added later with "Uni: Add course…".',
 		form,
 		'Create',
 		true,
@@ -146,24 +186,28 @@ export async function showSetupForm(defaults: {
 	if (!data) return null;
 
 	const weeks = Number(data.semesterWeeks);
+	const courses: CourseFields[] = [];
+	for (let i = 1; i <= COURSE_ROWS; i++) {
+		const name = String(data[`courseName${i}`] ?? '').trim();
+		if (!name) continue;
+		courses.push({
+			name,
+			code: String(data[`courseCode${i}`] ?? '').trim(),
+			instructor: String(data[`courseInstructor${i}`] ?? '').trim(),
+			credits: String(data[`courseCredits${i}`] ?? '').trim(),
+		});
+	}
 	return {
 		notebookName: (data.notebookName || '').trim(),
 		semesterName: (data.semesterName || '').trim(),
 		semesterStart: (data.semesterStart || '').trim(),
 		semesterWeeks: Number.isFinite(weeks) && weeks > 0 ? weeks : 14,
-		coursesRaw: (data.courses || '').trim(),
+		courses,
 		weeklyLectureNotes: data.weeklyLectureNotes === 'on',
 	};
 }
 
-export interface CourseFormResult {
-	name: string;
-	code: string;
-	instructor: string;
-	credits: string;
-}
-
-export async function showAddCourseForm(semesterWeeks: number): Promise<CourseFormResult | null> {
+export async function showAddCourseForm(semesterWeeks: number): Promise<CourseFields | null> {
 	const form = `
 		<label>Course name
 			<input type="text" name="name" placeholder="e.g. Epistemology" required>

@@ -10,6 +10,14 @@ import {
 import { createFolder, createNote, Folder, getAllFolders, getFolderNotes, updateNote } from './data';
 import type { UniSettings } from './settings';
 
+/** The per-course fields a user types in a form. */
+export interface CourseFields {
+	name: string;
+	code: string;
+	instructor: string;
+	credits: string;
+}
+
 export interface Course {
 	/** Course notebook id. */
 	folderId: string;

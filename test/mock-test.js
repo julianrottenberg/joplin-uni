@@ -181,7 +181,10 @@ async function main() {
 		semesterName: 'WiSe 2026/27',
 		semesterStart: '21.09.2026',
 		semesterWeeks: 3,
-		courses: 'Epistemology | PHI-301 | Dr. Smith | 5\nLinear Algebra | MATH-201 | Prof. Euler | 6',
+		courseName1: 'Epistemology', courseCode1: 'PHI-301', courseInstructor1: 'Dr. Smith', courseCredits1: '5',
+		courseName2: 'Linear Algebra', courseCode2: 'MATH-201', courseInstructor2: 'Prof. Euler', courseCredits2: '6',
+		// Rows without a name are ignored, even when other fields are filled in.
+		courseCode4: 'GHOST-100', courseInstructor4: 'Nobody',
 		weeklyLectureNotes: undefined, // unchecked
 	});
 	await joplin.commands.execute('uni.setup');
@@ -189,6 +192,7 @@ async function main() {
 	const uni = folderByTitle('University', '');
 	check('uni notebook created', !!uni);
 	check('two course notebooks', folderByTitle('Epistemology', uni.id) !== null && folderByTitle('Linear Algebra', uni.id) !== null);
+	check('empty course rows skipped', ![...store.folders.values()].some((f) => f.parent_id === uni.id && (!f.title || f.title === 'GHOST-100')));
 
 	const epi = folderByTitle('Epistemology', uni.id);
 	const epiNotes = notesInFolder(epi.id);
@@ -271,7 +275,7 @@ async function idempotencyScenario() {
 		semesterName: 'WiSe 2026/27',
 		semesterStart: '21.09.2026',
 		semesterWeeks: 3,
-		courses: 'Logic | LOG-101 | Dr. Tarski | 5',
+		courseName1: 'Logic', courseCode1: 'LOG-101', courseInstructor1: 'Dr. Tarski', courseCredits1: '5',
 		weeklyLectureNotes: 'on',
 	});
 	await joplin.commands.execute('uni.setup');
@@ -287,7 +291,7 @@ async function idempotencyScenario() {
 		semesterName: 'WiSe 2026/27',
 		semesterStart: '21.09.2026',
 		semesterWeeks: 3,
-		courses: 'Logic | LOG-101 | Dr. Tarski | 5',
+		courseName1: 'Logic', courseCode1: 'LOG-101', courseInstructor1: 'Dr. Tarski', courseCredits1: '5',
 		weeklyLectureNotes: 'on',
 	});
 	await joplin.commands.execute('uni.setup');

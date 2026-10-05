@@ -37,7 +37,7 @@ const SETTING_SECTION = 'uniSettings';
 export async function registerUniSettings(): Promise<void> {
 	await joplin.settings.registerSection(SETTING_SECTION, {
 		label: 'Uni',
-		description: 'University workspace. Most of this is set up by the wizard in the command palette (Ctrl+P, "Uni: Set up semester…").',
+		description: 'University workspace. Most of this is set up by the wizard in the command palette (Ctrl+Shift+P, "Uni: Set up semester…").',
 	});
 
 	await joplin.settings.registerSettings({

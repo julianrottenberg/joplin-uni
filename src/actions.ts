@@ -26,13 +26,13 @@ async function requireWorkspace() {
 	const uniFolder = await findUniFolder(settings, folders);
 	if (!uniFolder) {
 		await joplin.views.dialogs.showMessageBox(
-			`No "${settings.notebookName}" notebook found. Run Ctrl+P, then **Uni: Set up semester…** first.`,
+			`No "${settings.notebookName}" notebook found. Run Ctrl+Shift+P, then **Uni: Set up semester…** first.`,
 		);
 		return null;
 	}
 	const courses = await loadCourses(uniFolder.id, folders);
 	if (!courses.length) {
-		await joplin.views.dialogs.showMessageBox('No courses yet. Add one first via the command palette (Ctrl+P, "Uni: Add course…").');
+		await joplin.views.dialogs.showMessageBox('No courses yet. Add one first via the command palette (Ctrl+Shift+P, "Uni: Add course…").');
 		return null;
 	}
 	return { settings, uniFolder, courses };
