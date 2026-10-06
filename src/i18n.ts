@@ -162,11 +162,22 @@ const STRINGS = {
 	'toast.deadlineAdded': { en: 'Deadline added to {course} (reminder on {date}).', de: 'Frist zu {course} hinzugefügt (Erinnerung am {date}).' },
 	'toast.dashboardUpdated': { en: 'Uni dashboard updated.', de: 'Uni-Dashboard aktualisiert.' },
 
+	// --- Module details (Course Info block) ---
+	'mod.full.mandatory': { en: 'Mandatory module', de: 'Pflichtmodul' },
+	'mod.full.elective': { en: 'Elective module', de: 'Wahlpflichtmodul' },
+	'turnus.winter': { en: 'Winter semester', de: 'Wintersemester' },
+	'turnus.summer': { en: 'Summer semester', de: 'Sommersemester' },
+	'turnus.both': { en: 'Winter & summer semester', de: 'Winter- und Sommersemester' },
+
 	// --- Course Info note ---
 	'ci.code': { en: '**Code:**', de: '**Nummer:**' },
 	'ci.instructor': { en: '**Instructor:**', de: '**Dozent:in:**' },
 	'ci.credits': { en: '**Credits:**', de: '**ECTS:**' },
 	'ci.semester': { en: '**Semester:**', de: '**Semester:**' },
+	'ci.status': { en: '**Status:**', de: '**Status:**' },
+	'ci.sws': { en: '**Hours/week:**', de: '**SWS:**' },
+	'ci.turnus': { en: '**Offered:**', de: '**Turnus:**' },
+	'ci.exam': { en: '**Assessment:**', de: '**Prüfungsleistung:**' },
 	'ci.schedule': { en: '## Schedule', de: '## Zeitplan' },
 	'ci.grading': { en: '## Grading', de: '## Benotung' },
 	'ci.links': { en: '## Links', de: '## Links' },
@@ -199,9 +210,10 @@ const STRINGS = {
 		de: 'Noch keine Kurse — ergänze sie über die Befehlspalette (Strg+Umschalt+P, „Uni: Kurs hinzufügen…").',
 	},
 	'dash.tableHead': {
-		en: '| Course | Readings | Open to-dos | Next deadline |',
-		de: '| Kurs | Lesetexte | Offene To-dos | Nächste Frist |',
+		en: '| Course | Status | ECTS | Readings | Open to-dos | Next deadline |',
+		de: '| Kurs | Status | LP | Lesetexte | Offene To-dos | Nächste Frist |',
 	},
+	'dash.creditSummary': { en: '**{sum} ECTS**', de: '**{sum} LP**' },
 	'dash.deadlines': { en: '## Deadlines', de: '## Fristen' },
 	'dash.overdue': { en: '**Overdue**', de: '**Überfällig**' },
 	'dash.next14': { en: '**Next 14 days**', de: '**Nächste 14 Tage**' },
@@ -265,6 +277,10 @@ const STRINGS = {
 		de: '„de" = Deutsch, „en" = English. Meist im Einrichtungs-Assistenten gesetzt; die Einträge der Befehlspalette folgen nach einem Joplin-Neustart.',
 	},
 } as const;
+
+export const MODULE_STATUSES = ['mandatory', 'elective'] as const;
+
+export const TURNUS_OPTIONS = ['winter', 'summer', 'both'] as const;
 
 export type StringKey = keyof typeof STRINGS;
 

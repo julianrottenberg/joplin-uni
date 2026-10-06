@@ -15,27 +15,19 @@ import { findUniFolder, getOrCreateAutoFolder, getOrCreateAutoNote, getOrCreateF
 import type { CourseFields } from './uni';
 import { refreshDashboard } from './dashboard';
 
+import { emptyCourseDetails, renderCourseInfoBlock } from './course-info';
 async function toast(message: string, type: ToastType = ToastType.Success): Promise<void> {
 	await joplin.views.dialogs.showToast({ message, type, duration: 4000 });
 }
 
 function courseInfoBody(course: CourseFields, semesterName: string, lang: Lang): string {
-	const t = makeT(lang);
-	return [
-		`# ${course.name}`,
-		'',
-		`- ${t('ci.code')} ${course.code || '—'}`,
-		`- ${t('ci.instructor')} ${course.instructor || '—'}`,
-		`- ${t('ci.credits')} ${course.credits || '—'}`,
-		`- ${t('ci.semester')} ${semesterName || '—'}`,
-		'',
-		t('ci.schedule'),
-		'',
-		t('ci.grading'),
-		'',
-		t('ci.links'),
-		'',
-	].join('\n');
+	return renderCourseInfoBlock(course.name, {
+		...emptyCourseDetails(),
+		code: course.code,
+		instructor: course.instructor,
+		ects: course.credits,
+		semester: semesterName,
+	}, lang);
 }
 
 export function readingListBody(courseName: string, weeks: number, lang: Lang): string {

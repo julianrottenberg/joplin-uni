@@ -1,6 +1,6 @@
 {
 	"name": "joplin-plugin-uni",
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"description": "Set up and organise Joplin for university: semester wizard, courses, reading lists, deadlines and a dashboard — all inside one notebook.",
 	"scripts": {
 		"dist": "webpack --env joplin-plugin-config=buildMain && webpack --env joplin-plugin-config=buildExtraScripts && webpack --env joplin-plugin-config=createArchive",

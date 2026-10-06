@@ -1,6 +1,7 @@
 import joplin from 'api';
 import { DASHBOARD_MARKER } from './constants';
 import { makeT } from './i18n';
+import { CourseDetails, emptyCourseDetails, moduleStatusLabel, parseCourseDetails, parseCredits } from './course-info';
 import { getAllFolders, getFolderNotes, getNote } from './data';
 import {
 	currentSemesterWeek,
@@ -111,6 +112,17 @@ export async function refreshDashboard(options: { silent?: boolean } = {}): Prom
 		readingByCourse.set(course.folderId, parseReadingBody(note.body || ''));
 	}
 
+	// Module details per course (from the managed Course Info block).
+	const detailsByCourse = new Map<string, CourseDetails>();
+	for (const course of courses) {
+		if (!course.infoNoteId) {
+			detailsByCourse.set(course.folderId, emptyCourseDetails());
+			continue;
+		}
+		const note = await getNote(course.infoNoteId, ['body']);
+		detailsByCourse.set(course.folderId, parseCourseDetails(note.body || '').details);
+	}
+
 	// Open to-dos with a due date.
 	const openTodos = allNotes
 		.filter((n) => n.is_todo === 1 && n.todo_due > 0 && !n.todo_completed)
@@ -148,6 +160,7 @@ export async function refreshDashboard(options: { silent?: boolean } = {}): Prom
 		allNotes,
 		dashboardId: dashboard?.id ?? null,
 		courseNameMap,
+		detailsByCourse,
 	});
 
 	const dashboardId = await writeDashboardNote(uniFolder.id, settings.dashboardTitle, body);
@@ -165,6 +178,7 @@ interface DashboardContext {
 	allNotes: NoteRow[];
 	dashboardId: string | null;
 	courseNameMap: Map<string, string>;
+	detailsByCourse: Map<string, CourseDetails>;
 }
 
 function buildDashboardBody(ctx: DashboardContext): string {
@@ -193,9 +207,10 @@ function buildDashboardBody(ctx: DashboardContext): string {
 	if (!courses.length) {
 		lines.push(t('dash.noCourses'), '');
 	} else {
-		lines.push(t('dash.tableHead'), '| --- | --- | --- | --- |');
+		lines.push(t('dash.tableHead'), '| --- | --- | --- | --- | --- | --- |');
 		for (const course of courses) {
 			const reading = ctx.readingByCourse.get(course.folderId) ?? { total: 0, done: 0, nextUp: [] };
+			const details = ctx.detailsByCourse.get(course.folderId) ?? emptyCourseDetails();
 			const readingCell = reading.total
 				? `${reading.done}/${reading.total}`
 				: '—';
@@ -207,9 +222,16 @@ function buildDashboardBody(ctx: DashboardContext): string {
 			const nameCell = course.infoNoteId
 				? `[${course.name}](:/${course.infoNoteId})`
 				: course.name;
-			lines.push(`| ${nameCell} | ${readingCell} | ${openCount || '—'} | ${nextCell} |`);
+			const statusCell = moduleStatusLabel(details.status, settings.language) || '—';
+			const ectsCell = details.ects || '—';
+			lines.push(`| ${nameCell} | ${statusCell} | ${ectsCell} | ${readingCell} | ${openCount || '—'} | ${nextCell} |`);
 		}
 		lines.push('');
+		const totalCredits = courses.reduce((sum, course) => {
+			const details = ctx.detailsByCourse.get(course.folderId);
+			return sum + (details ? (parseCredits(details.ects) ?? 0) : 0);
+		}, 0);
+		if (totalCredits > 0) lines.push(t('dash.creditSummary', { sum: totalCredits }), '');
 	}
 
 	// --- Deadlines ---
