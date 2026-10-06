@@ -49,6 +49,10 @@ const joplin = {
 		async setValue(k, v) {
 			this._vals[k] = v;
 		},
+		async globalValue(key) {
+			if (key === 'locale') return 'en_US';
+			return '';
+		},
 	},
 	commands: {
 		_cmds: {},
@@ -182,6 +186,7 @@ async function main() {
 
 	// --- 1. Setup wizard ---
 	dialogQueue.push({
+		language: 'en',
 		notebookName: 'University',
 		semesterName: 'WiSe 2026/27',
 		semesterStart: '21.09.2026',
@@ -276,6 +281,34 @@ async function main() {
 	const sta = folderByTitle('Statistik', uni.id);
 	check('nested form data unwrapped (course created)', !!sta && notesInFolder(sta.id).some((n) => n.title === 'Course Info'));
 
+	// --- 8. German language scenario ---
+	// The wizard's language selector must switch every created item;
+	// the mock locale above stays en_US, so only the form choice can do it.
+	dialogQueue.push({
+		language: 'de',
+		notebookName: 'Universität',
+		semesterName: 'WiSe 2026/27',
+		semesterStart: '21.09.2026',
+		semesterWeeks: 2,
+		courseName1: 'Erkenntnistheorie',
+		weeklyLectureNotes: 'on',
+	});
+	await joplin.commands.execute('uni.setup');
+
+	const deUni = folderByTitle('Universität', '');
+	check('German uni notebook created', !!deUni);
+	const deCourse = folderByTitle('Erkenntnistheorie', deUni.id);
+	check('German course notebook created', !!deCourse);
+	check('German course info note', notesInFolder(deCourse.id).some((n) => n.title === 'Kursinfo'));
+	const deReading = notesInFolder(deCourse.id).find((n) => n.title === 'Literaturliste');
+	check('German reading list with Woche headings', !!deReading && deReading.body.includes('## Woche 1') && deReading.body.includes('## Woche 2'));
+	check('German lectures folder', folderByTitle('Vorlesungen', deCourse.id) !== null);
+	check('German assignments folder', folderByTitle('Abgaben', deCourse.id) !== null);
+	check('German toast shown', toasts.some((toast) => toast.message.includes('angelegt')));
+
+	await joplin.commands.execute('uni.refreshDashboard');
+	const deDashboard = notesInFolder(deUni.id).find((n) => n.body.includes('uni-dashboard'));
+	check('German dashboard headings', !!deDashboard && deDashboard.body.includes('## Kurse') && deDashboard.body.includes('## Fristen'));
 	console.log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : failures + ' CHECK(S) FAILED'}`);
 	return failures === 0;
 }
@@ -285,6 +318,7 @@ async function idempotencyScenario() {
 
 	// Setup with weekly lecture stubs on.
 	dialogQueue.push({
+		language: 'en',
 		notebookName: 'University',
 		semesterName: 'WiSe 2026/27',
 		semesterStart: '21.09.2026',
@@ -301,6 +335,7 @@ async function idempotencyScenario() {
 
 	// Re-run the same setup: nothing should be duplicated.
 	dialogQueue.push({
+		language: 'en',
 		notebookName: 'University',
 		semesterName: 'WiSe 2026/27',
 		semesterStart: '21.09.2026',

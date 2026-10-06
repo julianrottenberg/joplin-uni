@@ -3,6 +3,7 @@
 // Storage format is ISO (YYYY-MM-DD). Everything the user types or sees is
 // German (DD.MM.YYYY). parseUserDate accepts both, so old values keep working.
 
+import { Lang, makeT } from './i18n';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -97,24 +98,26 @@ export function formatDate(ms: number): string {
 }
 
 /** "today", "tomorrow", "in 3 days", "3 days overdue"… */
-export function relativeDueLabel(ms: number): string {
+export function relativeDueLabel(ms: number, lang: Lang = 'en'): string {
+	const t = makeT(lang);
 	const days = daysUntil(ms);
-	if (days === 0) return 'today';
-	if (days === 1) return 'tomorrow';
-	if (days === -1) return 'yesterday';
-	if (days > 1) return `in ${days} days`;
-	return `${-days} days overdue`;
+	if (days === 0) return t('rel.today');
+	if (days === 1) return t('rel.tomorrow');
+	if (days === -1) return t('rel.yesterday');
+	if (days > 1) return t('rel.inDays', { n: days });
+	return t('rel.overdue', { n: -days });
 }
 
 /** "just now", "2h ago", "3d ago"… */
-export function relativeUpdatedLabel(ms: number): string {
+export function relativeUpdatedLabel(ms: number, lang: Lang = 'en'): string {
+	const t = makeT(lang);
 	const diff = Date.now() - ms;
 	const mins = Math.floor(diff / 60000);
-	if (mins < 1) return 'just now';
-	if (mins < 60) return `${mins}m ago`;
+	if (mins < 1) return t('rel.justNow');
+	if (mins < 60) return t('rel.minsAgo', { n: mins });
 	const hours = Math.floor(mins / 60);
-	if (hours < 24) return `${hours}h ago`;
+	if (hours < 24) return t('rel.hoursAgo', { n: hours });
 	const days = Math.floor(hours / 24);
-	if (days < 30) return `${days}d ago`;
+	if (days < 30) return t('rel.daysAgo', { n: days });
 	return formatDate(ms);
 }

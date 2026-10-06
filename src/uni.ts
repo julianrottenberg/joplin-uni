@@ -1,14 +1,8 @@
 import joplin from 'api';
-import {
-	AUTO_FOLDER_TITLES,
-	ASSIGNMENTS_FOLDER_TITLE,
-	COURSE_INFO_TITLE,
-	DASHBOARD_MARKER,
-	LECTURES_FOLDER_TITLE,
-	READING_LIST_TITLE,
-} from './constants';
-import { createFolder, createNote, Folder, getAllFolders, getFolderNotes, updateNote } from './data';
-import type { UniSettings } from './settings';
+import { UniSettings } from './settings';
+import { DASHBOARD_MARKER } from './constants';
+import { autoAliases, autoFolderTitleAliases, autoTitle, AutoTitleKey, Lang } from './i18n';
+import { createFolder, createNote, Folder, getAllFolders, getFolderNotes, updateFolder, updateNote } from './data';
 
 /** The per-course fields a user types in a form. */
 export interface CourseFields {
@@ -71,7 +65,7 @@ export function subtreeFolderIds(uniFolderId: string, folders: Folder[]): Set<st
 /** Course notebooks: direct children of the Uni notebook, minus auto-managed folders. */
 export function courseFolders(uniFolderId: string, folders: Folder[]): Folder[] {
 	return folders
-		.filter((f) => f.parent_id === uniFolderId && !AUTO_FOLDER_TITLES.includes(f.title))
+		.filter((f) => f.parent_id === uniFolderId && !autoFolderTitleAliases().includes(f.title))
 		.sort((a, b) => a.title.localeCompare(b.title));
 }
 
@@ -97,10 +91,10 @@ export async function loadCourses(uniFolderId: string, folders: Folder[]): Promi
 		out.push({
 			folderId: folder.id,
 			name: folder.title,
-			infoNoteId: notes.find((n: any) => n.title === COURSE_INFO_TITLE)?.id ?? null,
-			readingNoteId: notes.find((n: any) => n.title === READING_LIST_TITLE)?.id ?? null,
-			lecturesFolderId: childFolders.find((f) => f.title === LECTURES_FOLDER_TITLE)?.id ?? null,
-			assignmentsFolderId: childFolders.find((f) => f.title === ASSIGNMENTS_FOLDER_TITLE)?.id ?? null,
+			infoNoteId: notes.find((n: any) => autoAliases('courseInfo').includes(n.title))?.id ?? null,
+			readingNoteId: notes.find((n: any) => autoAliases('readingList').includes(n.title))?.id ?? null,
+			lecturesFolderId: childFolders.find((f) => autoAliases('lecturesFolder').includes(f.title))?.id ?? null,
+			assignmentsFolderId: childFolders.find((f) => autoAliases('assignmentsFolder').includes(f.title))?.id ?? null,
 		});
 	}
 	return out;
@@ -113,10 +107,38 @@ export async function getOrCreateFolder(parentId: string, title: string, folders
 	return createFolder(title, parentId);
 }
 
-export async function getOrCreateNote(parentId: string, title: string, body: string): Promise<{ id: string; created: boolean }> {
+export async function getOrCreateAutoFolder(
+	parentId: string,
+	key: AutoTitleKey,
+	lang: Lang,
+	folders?: Folder[],
+): Promise<Folder> {
+	const title = autoTitle(key, lang);
+	const all = folders ?? (await getAllFolders());
+	const existing = all.find((f) => f.parent_id === parentId && autoAliases(key).includes(f.title));
+	if (existing) {
+		// Normalize the title to the active language.
+		if (existing.title !== title) await updateFolder(existing.id, { title });
+		return existing;
+	}
+	return createFolder(title, parentId);
+}
+
+export async function getOrCreateAutoNote(
+	parentId: string,
+	key: AutoTitleKey,
+	body: string,
+	lang: Lang,
+): Promise<{ id: string; created: boolean }> {
+	const title = autoTitle(key, lang);
 	const notes = await getFolderNotes(parentId, ['id', 'title']);
-	const existing = notes.find((n: any) => n.title === title);
-	if (existing) return { id: existing.id, created: false };
+	const existing = notes.find((n: any) => autoAliases(key).includes(n.title));
+	if (existing) {
+		// Rename to the active language, but never touch the body — the note
+		// may hold user content (the reading list does).
+		if (existing.title !== title) await updateNote(existing.id, { title });
+		return { id: existing.id, created: false };
+	}
 	const note = await createNote({ title, body, parent_id: parentId });
 	return { id: note.id, created: true };
 }

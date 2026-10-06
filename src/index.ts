@@ -1,48 +1,49 @@
 import joplin from 'api';
 import { ToastType } from 'api/types';
 import { CMD } from './constants';
-import { getUniSettings, registerUniSettings } from './settings';
+import { getUniSettings, registerUniSettings, startupLanguage } from './settings';
 import { refreshDashboard } from './dashboard';
 import { runSetupWizard, addCourse } from './setup';
 import { newLectureNote, addReading, addDeadline } from './actions';
 import { findDashboardNote, findUniFolder } from './uni';
 import { getAllFolders } from './data';
+import { commandLabel, makeT } from './i18n';
+import type { Lang, T } from './i18n';
 
 /**
  * Wraps a command so that any failure surfaces as a dialog instead of the
  * command silently doing nothing — the plugin's worst failure mode.
  */
-function runCommand(execute: () => Promise<void>): () => Promise<void> {
+function runCommand(t: T, execute: () => Promise<void>): () => Promise<void> {
 	return async () => {
 		try {
 			await execute();
 		} catch (error) {
 			console.error('uni: command failed', error);
 			await joplin.views.dialogs.showMessageBox(
-				`Uni plugin: something went wrong.\n\n${error instanceof Error ? error.message : String(error)}`,
+				`${t('err.crashTitle')}\n\n${error instanceof Error ? error.message : String(error)}`,
 			);
 		}
 	};
 }
-
-async function refreshDashboardCommand(): Promise<void> {
+async function refreshDashboardCommand(t: T): Promise<void> {
 	const id = await refreshDashboard();
 	if (id) {
 		await joplin.views.dialogs.showToast({
-			message: 'Uni dashboard updated.',
+			message: t('toast.dashboardUpdated'),
 			type: ToastType.Success,
 			duration: 3000,
 		});
 	}
 }
 
-async function openDashboard(): Promise<void> {
+async function openDashboard(t: T): Promise<void> {
 	const settings = await getUniSettings();
 	const folders = await getAllFolders();
 	const uniFolder = await findUniFolder(settings, folders);
 	if (!uniFolder) {
 		await joplin.views.dialogs.showMessageBox(
-			`No "${settings.notebookName}" notebook found. Run Ctrl+Shift+P, then **Uni: Set up semester…** to create it.`,
+			t('err.noNotebookCreate', { name: settings.notebookName }),
 		);
 		return;
 	}
@@ -56,49 +57,50 @@ async function openDashboard(): Promise<void> {
 
 	await joplin.commands.execute('openNote', dashboard.id);
 }
-
-async function registerCommands(): Promise<void> {
+async function registerCommands(lang: Lang): Promise<void> {
+	const t = makeT(lang);
 	await joplin.commands.register({
 		name: CMD.setup,
-		label: 'Uni: Set up semester…',
-		execute: runCommand(runSetupWizard),
+		label: commandLabel(CMD.setup, lang),
+		execute: runCommand(t, runSetupWizard),
 	});
 	await joplin.commands.register({
 		name: CMD.addCourse,
-		label: 'Uni: Add course…',
-		execute: runCommand(addCourse),
+		label: commandLabel(CMD.addCourse, lang),
+		execute: runCommand(t, addCourse),
 	});
 	await joplin.commands.register({
 		name: CMD.newLectureNote,
-		label: 'Uni: New lecture note…',
-		execute: runCommand(newLectureNote),
+		label: commandLabel(CMD.newLectureNote, lang),
+		execute: runCommand(t, newLectureNote),
 	});
 	await joplin.commands.register({
 		name: CMD.addReading,
-		label: 'Uni: Add reading…',
-		execute: runCommand(addReading),
+		label: commandLabel(CMD.addReading, lang),
+		execute: runCommand(t, addReading),
 	});
 	await joplin.commands.register({
 		name: CMD.addDeadline,
-		label: 'Uni: Add deadline…',
-		execute: runCommand(addDeadline),
+		label: commandLabel(CMD.addDeadline, lang),
+		execute: runCommand(t, addDeadline),
 	});
 	await joplin.commands.register({
 		name: CMD.refreshDashboard,
-		label: 'Uni: Refresh dashboard',
-		execute: runCommand(refreshDashboardCommand),
+		label: commandLabel(CMD.refreshDashboard, lang),
+		execute: runCommand(t, () => refreshDashboardCommand(t)),
 	});
 	await joplin.commands.register({
 		name: CMD.openDashboard,
-		label: 'Uni: Open dashboard',
-		execute: runCommand(openDashboard),
+		label: commandLabel(CMD.openDashboard, lang),
+		execute: runCommand(t, () => openDashboard(t)),
 	});
 }
 
 joplin.plugins.register({
 	onStart: async function() {
-		await registerUniSettings();
-		await registerCommands();
+		const lang = await startupLanguage();
+		await registerUniSettings(lang);
+		await registerCommands(lang);
 
 		// No menus, no toolbar buttons, no icons: the plugin is reachable only
 		// through the command palette (Ctrl+Shift+P, "Uni: …") and Options → Uni.

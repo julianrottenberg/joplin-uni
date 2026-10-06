@@ -1,6 +1,15 @@
 import joplin from 'api';
 import type { Course, CourseFields } from './uni';
-import { DEADLINE_TYPES, READING_PRIORITIES } from './constants';
+import {
+	DEADLINE_TYPES,
+	isLang,
+	LANG_LABELS,
+	LANGUAGE_SELECT_LABEL,
+	Lang,
+	makeT,
+	READING_PRIORITIES,
+	T,
+} from './i18n';
 import { isoToGerman, todayGerman } from './dates';
 
 const DIALOG_CSS = `
@@ -70,21 +79,24 @@ export function escapeHtml(s: string): string {
 		.replace(/'/g, '&#39;');
 }
 
+/** Dialog form values after unwrapping: field name → serialized value. */
+export type FormDataRecord = Record<string, string>;
+
 /**
  * Joplin nests dialog form values under each form's name attribute:
  * `{ [formName]: { field: value } }` — an unnamed form lands under the
  * literal key "null" (see serializeForms in UserWebviewIndex.js in the
  * Joplin repo). This unwraps that shape; flat values are passed through.
  */
-export function unwrapFormData(raw: Record<string, any> | null | undefined): Record<string, any> {
+export function unwrapFormData(raw: Record<string, unknown> | null | undefined): FormDataRecord {
 	if (!raw || typeof raw !== 'object') return {};
 	const keys = Object.keys(raw);
 	const nested = keys.length > 0 && keys.every((k) => {
 		const value = raw[k];
 		return !!value && typeof value === 'object' && !Array.isArray(value);
 	});
-	if (!nested) return raw as Record<string, any>;
-	const merged: Record<string, any> = {};
+	if (!nested) return raw as FormDataRecord;
+	const merged: FormDataRecord = {};
 	for (const k of keys) Object.assign(merged, raw[k]);
 	return merged;
 }
@@ -102,7 +114,8 @@ export async function openFormDialog(
 	formHtml: string,
 	okLabel = 'OK',
 	tall = false,
-): Promise<Record<string, any> | null> {
+	cancelLabel = 'Cancel',
+): Promise<FormDataRecord | null> {
 	let handle = dialogHandles.get(dialogId);
 	if (!handle) {
 		handle = await joplin.views.dialogs.create(dialogId);
@@ -111,7 +124,7 @@ export async function openFormDialog(
 	await joplin.views.dialogs.setHtml(handle, pageHtml(title, hint, formHtml, tall));
 	await joplin.views.dialogs.setButtons(handle, [
 		{ id: 'ok', title: okLabel },
-		{ id: 'cancel', title: 'Cancel' },
+		{ id: 'cancel', title: cancelLabel },
 	]);
 	// Fixed-size sheet: Joplin's auto-sizing mismeasures on HiDPI screens.
 	await joplin.views.dialogs.setFitToContent(handle, false);
@@ -138,33 +151,34 @@ export interface SetupFormResult {
 	semesterWeeks: number;
 	courses: CourseFields[];
 	weeklyLectureNotes: boolean;
+	language: Lang;
 }
 
 /** Course rows shown in the setup wizard. Empty rows are ignored. */
 const COURSE_ROWS = 8;
 
-function courseFieldsHtml(): string {
+function courseFieldsHtml(t: T): string {
 	const rows: string[] = [];
 	for (let i = 1; i <= COURSE_ROWS; i++) {
 		const example = i === 1;
 		rows.push(`
 			<div class="course-row">
 				<span class="num">${i}</span>
-				<input class="c-name" type="text" name="courseName${i}" placeholder="${example ? 'e.g. Epistemology' : ''}" aria-label="Course ${i} name">
-				<input class="c-code" type="text" name="courseCode${i}" placeholder="${example ? 'PHI-301' : ''}" aria-label="Course ${i} code">
-				<input class="c-instructor" type="text" name="courseInstructor${i}" placeholder="${example ? 'Dr. Smith' : ''}" aria-label="Course ${i} instructor">
-				<input class="c-credits" type="text" name="courseCredits${i}" placeholder="${example ? '5 ECTS' : ''}" aria-label="Course ${i} credits">
+				<input class="c-name" type="text" name="courseName${i}" placeholder="${example ? escapeHtml(t('setup.example.name')) : ''}" aria-label="${escapeHtml(t('setup.aria.name', { i }))}">
+				<input class="c-code" type="text" name="courseCode${i}" placeholder="${example ? 'PHI-301' : ''}" aria-label="${escapeHtml(t('setup.aria.code', { i }))}">
+				<input class="c-instructor" type="text" name="courseInstructor${i}" placeholder="${example ? escapeHtml(t('setup.example.instructor')) : ''}" aria-label="${escapeHtml(t('setup.aria.instructor', { i }))}">
+				<input class="c-credits" type="text" name="courseCredits${i}" placeholder="${example ? '5 ECTS' : ''}" aria-label="${escapeHtml(t('setup.aria.credits', { i }))}">
 			</div>`);
 	}
 	return `
 		<div class="courses">
-			<div class="courses-title">Courses <span class="muted">— only the name is required; leave rows you don't need empty</span></div>
+			<div class="courses-title">${t('setup.courses')} <span class="muted">${t('setup.coursesHint')}</span></div>
 			<div class="courses-head">
 				<span class="num"></span>
-				<span class="c-name">Course name</span>
-				<span class="c-code">Code</span>
-				<span class="c-instructor">Instructor</span>
-				<span class="c-credits">Credits</span>
+				<span class="c-name">${t('setup.head.name')}</span>
+				<span class="c-code">${t('setup.head.code')}</span>
+				<span class="c-instructor">${t('setup.head.instructor')}</span>
+				<span class="c-credits">${t('setup.head.credits')}</span>
 			</div>
 			<div class="course-rows">${rows.join('')}</div>
 		</div>`;
@@ -175,32 +189,42 @@ export async function showSetupForm(defaults: {
 	semesterName: string;
 	semesterStart: string;
 	semesterWeeks: number;
+	language: Lang;
 }): Promise<SetupFormResult | null> {
+	const t = makeT(defaults.language);
+	const langOptions = (['de', 'en'] as Lang[])
+		.map((l) => `<option value="${l}" ${defaults.language === l ? 'selected' : ''}>${LANG_LABELS[l]}</option>`)
+		.join('');
 	const form = `
-		<label>University notebook
+		<label>${LANGUAGE_SELECT_LABEL}
+			<select name="language">${langOptions}</select>
+		</label>
+		<p class="hint">${t('setup.langHint')}</p>
+		<label>${t('setup.notebook')}
 			<input type="text" name="notebookName" value="${escapeHtml(defaults.notebookName)}" required>
 		</label>
 		<div class="row">
-			<label>Semester
-				<input type="text" name="semesterName" value="${escapeHtml(defaults.semesterName)}" placeholder="e.g. WiSe 2026/27">
+			<label>${t('setup.semester')}
+				<input type="text" name="semesterName" value="${escapeHtml(defaults.semesterName)}" placeholder="${escapeHtml(t('setup.semesterPh'))}">
 			</label>
-			<label>Start date
+			<label>${t('setup.start')}
 				<input type="text" name="semesterStart" value="${escapeHtml(isoToGerman(defaults.semesterStart))}" placeholder="TT.MM.JJJJ">
 			</label>
-			<label>Weeks
+			<label>${t('setup.weeks')}
 				<input type="number" name="semesterWeeks" min="1" max="40" value="${defaults.semesterWeeks}" required>
 			</label>
 		</div>
-		${courseFieldsHtml()}
-		<label class="check"><input type="checkbox" name="weeklyLectureNotes"> Create a lecture note for every week</label>
+		${courseFieldsHtml(t)}
+		<label class="check"><input type="checkbox" name="weeklyLectureNotes"> ${t('setup.weeklyNotes')}</label>
 	`;
 	const data = await openFormDialog(
 		'uni-setup',
-		'Set up your Uni workspace',
-		'Everything is created inside one notebook, so your private notes stay separate. More courses can be added later with "Uni: Add course…".',
+		t('setup.title'),
+		t('setup.hint'),
 		form,
-		'Create',
+		t('setup.create'),
 		true,
+		t('btn.cancel'),
 	);
 	if (!data) return null;
 
@@ -223,37 +247,41 @@ export async function showSetupForm(defaults: {
 		semesterWeeks: Number.isFinite(weeks) && weeks > 0 ? weeks : 14,
 		courses,
 		weeklyLectureNotes: data.weeklyLectureNotes === 'on',
+		language: isLang(data.language) ? data.language : defaults.language,
 	};
 }
 
-export async function showAddCourseForm(semesterWeeks: number): Promise<CourseFields | null> {
+export async function showAddCourseForm(semesterWeeks: number, lang: Lang): Promise<CourseFields | null> {
+	const t = makeT(lang);
 	const form = `
-		<label>Course name
-			<input type="text" name="name" placeholder="e.g. Epistemology" required>
+		<label>${t('addCourse.name')}
+			<input type="text" name="name" placeholder="${escapeHtml(t('setup.example.name'))}" required>
 		</label>
 		<div class="row">
-			<label>Code
+			<label>${t('addCourse.code')}
 				<input type="text" name="code" placeholder="PHI-301">
 			</label>
-			<label>Instructor
-				<input type="text" name="instructor" placeholder="Dr. Smith">
+			<label>${t('addCourse.instructor')}
+				<input type="text" name="instructor" placeholder="${escapeHtml(t('setup.example.instructor'))}">
 			</label>
-			<label>Credits
+			<label>${t('addCourse.credits')}
 				<input type="text" name="credits" placeholder="5 ECTS">
 			</label>
 		</div>
 	`;
 	const data = await openFormDialog(
 		'uni-add-course',
-		'Add a course',
-		`Creates a course notebook with Course Info, Reading List (${semesterWeeks} week sections), Lectures and Assignments.`,
+		t('addCourse.title'),
+		t('addCourse.hint', { weeks: semesterWeeks }),
 		form,
-		'Add course',
+		t('addCourse.button'),
+		false,
+		t('btn.cancel'),
 	);
 	if (!data) return null;
 	const name = (data.name || '').trim();
 	if (!name) {
-		await joplin.views.dialogs.showMessageBox('Please enter a course name.');
+		await joplin.views.dialogs.showMessageBox(t('msg.enterCourseName'));
 		return null;
 	}
 	return {
@@ -271,32 +299,35 @@ export interface LectureFormResult {
 	topic: string;
 }
 
-export async function showLectureForm(courses: Course[], defaultWeek: number | null): Promise<LectureFormResult | null> {
+export async function showLectureForm(courses: Course[], defaultWeek: number | null, lang: Lang): Promise<LectureFormResult | null> {
+	const t = makeT(lang);
 	const form = `
-		<label>Course ${courseSelect(courses)}</label>
+		<label>${t('lecture.course')} ${courseSelect(courses)}</label>
 		<div class="row">
-			<label>Week
+			<label>${t('lecture.week')}
 				<input type="number" name="week" min="1" max="40" value="${defaultWeek ?? 1}" required>
 			</label>
-			<label>Date
+			<label>${t('lecture.date')}
 				<input type="text" name="date" value="${todayGerman()}" placeholder="TT.MM.JJJJ">
 			</label>
 		</div>
-		<label>Topic
-			<input type="text" name="topic" placeholder="e.g. Gettier cases" required>
+		<label>${t('lecture.topic')}
+			<input type="text" name="topic" placeholder="${escapeHtml(t('lecture.topicPh'))}" required>
 		</label>
 	`;
 	const data = await openFormDialog(
 		'uni-new-lecture',
-		'New lecture note',
-		'Creates a lecture note in the course\'s Lectures notebook.',
+		t('lecture.title'),
+		t('lecture.hint'),
 		form,
-		'Create note',
+		t('lecture.button'),
+		false,
+		t('btn.cancel'),
 	);
 	if (!data) return null;
 	const topic = (data.topic || '').trim();
 	if (!topic) {
-		await joplin.views.dialogs.showMessageBox('Please enter a topic.');
+		await joplin.views.dialogs.showMessageBox(t('msg.enterTopic'));
 		return null;
 	}
 	const week = Number(data.week);
@@ -315,42 +346,46 @@ export interface ReadingFormResult {
 	text: string;
 }
 
-export async function showReadingForm(courses: Course[], defaultWeek: number | null): Promise<ReadingFormResult | null> {
-	const priorityOptions = READING_PRIORITIES.map(
+export async function showReadingForm(courses: Course[], defaultWeek: number | null, lang: Lang): Promise<ReadingFormResult | null> {
+	const t = makeT(lang);
+	const priorities = READING_PRIORITIES[lang];
+	const priorityOptions = priorities.map(
 		(p, i) => `<option value="${p}" ${i === 0 ? 'selected' : ''}>${p}</option>`,
 	).join('');
 	const form = `
-		<label>Course ${courseSelect(courses)}</label>
+		<label>${t('lecture.course')} ${courseSelect(courses)}</label>
 		<div class="row">
-			<label>Week (0 = further reading)
+			<label>${t('reading.week')}
 				<input type="number" name="week" min="0" max="40" value="${defaultWeek ?? 0}">
 			</label>
-			<label>Priority
+			<label>${t('reading.priority')}
 				<select name="priority">${priorityOptions}</select>
 			</label>
 		</div>
-		<label>Reading
-			<textarea name="text" rows="3" placeholder="e.g. Gettier (1963) — Is Justified True Belief Knowledge?, pp. 121–123" required></textarea>
+		<label>${t('reading.label')}
+			<textarea name="text" rows="3" placeholder="${escapeHtml(t('reading.ph'))}" required></textarea>
 		</label>
 	`;
 	const data = await openFormDialog(
 		'uni-add-reading',
-		'Add a reading',
-		'Appends the item to the course reading list. Add a link inside the text if you like: [PDF](https://…)',
+		t('reading.title'),
+		t('reading.hint'),
 		form,
-		'Add',
+		t('reading.button'),
+		false,
+		t('btn.cancel'),
 	);
 	if (!data) return null;
 	const text = (data.text || '').trim();
 	if (!text) {
-		await joplin.views.dialogs.showMessageBox('Please enter a reading.');
+		await joplin.views.dialogs.showMessageBox(t('msg.enterReading'));
 		return null;
 	}
 	const week = Number(data.week);
 	return {
 		courseId: data.course,
 		week: Number.isFinite(week) && week > 0 ? week : null,
-		priority: data.priority || READING_PRIORITIES[0],
+		priority: data.priority || priorities[0],
 		text,
 	};
 }
@@ -362,39 +397,43 @@ export interface DeadlineFormResult {
 	due: string;
 }
 
-export async function showDeadlineForm(courses: Course[]): Promise<DeadlineFormResult | null> {
-	const typeOptions = DEADLINE_TYPES.map((t, i) => `<option value="${t}" ${i === 0 ? 'selected' : ''}>${t}</option>`).join('');
+export async function showDeadlineForm(courses: Course[], lang: Lang): Promise<DeadlineFormResult | null> {
+	const t = makeT(lang);
+	const types = DEADLINE_TYPES[lang];
+	const typeOptions = types.map((type, i) => `<option value="${type}" ${i === 0 ? 'selected' : ''}>${type}</option>`).join('');
 	const form = `
-		<label>Course ${courseSelect(courses)}</label>
+		<label>${t('lecture.course')} ${courseSelect(courses)}</label>
 		<div class="row">
-			<label>Type
+			<label>${t('deadline.type')}
 				<select name="type">${typeOptions}</select>
 			</label>
-			<label>Due date
+			<label>${t('deadline.due')}
 				<input type="text" name="due" value="${todayGerman()}" placeholder="TT.MM.JJJJ" required>
 			</label>
 		</div>
-		<label>Title
-			<input type="text" name="title" placeholder="e.g. Essay 1 — Skepticism" required>
+		<label>${t('deadline.titleLabel')}
+			<input type="text" name="title" placeholder="${escapeHtml(t('deadline.titlePh'))}" required>
 		</label>
 	`;
 	const data = await openFormDialog(
 		'uni-add-deadline',
-		'Add a deadline',
-		'Creates a to-do in the course\'s Assignments notebook with a reminder on the due date.',
+		t('deadline.title'),
+		t('deadline.hint'),
 		form,
-		'Add',
+		t('deadline.button'),
+		false,
+		t('btn.cancel'),
 	);
 	if (!data) return null;
 	const title = (data.title || '').trim();
 	const due = (data.due || '').trim();
 	if (!title || !due) {
-		await joplin.views.dialogs.showMessageBox('Please enter a title and a due date.');
+		await joplin.views.dialogs.showMessageBox(t('msg.enterTitleDue'));
 		return null;
 	}
 	return {
 		courseId: data.course,
-		type: data.type || 'Assignment',
+		type: data.type || types[0],
 		title,
 		due,
 	};

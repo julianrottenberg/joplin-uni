@@ -1,17 +1,17 @@
 import joplin from 'api';
 import { ToastType } from 'api/types';
 import {
-	COURSE_INFO_TITLE,
-	LECTURES_FOLDER_TITLE,
-	READING_LIST_TITLE,
-	ASSIGNMENTS_FOLDER_TITLE,
-	FURTHER_READING_HEADING,
-} from './constants';
+	furtherReadingHeading,
+	makeT,
+	weekHeading,
+	weekLabel,
+} from './i18n';
+import type { Lang } from './i18n';
 import { createFolder, createNote, Folder, getAllFolders, getFolderNotes } from './data';
 import { germanToIso, isValidUserDate } from './dates';
 import { showAddCourseForm, showSetupForm } from './dialogs';
 import { getUniSettings, setUniSetting, UniSettings } from './settings';
-import { getOrCreateFolder, getOrCreateNote, findUniFolder } from './uni';
+import { findUniFolder, getOrCreateAutoFolder, getOrCreateAutoNote, getOrCreateFolder } from './uni';
 import type { CourseFields } from './uni';
 import { refreshDashboard } from './dashboard';
 
@@ -19,34 +19,36 @@ async function toast(message: string, type: ToastType = ToastType.Success): Prom
 	await joplin.views.dialogs.showToast({ message, type, duration: 4000 });
 }
 
-function courseInfoBody(course: CourseFields, semesterName: string): string {
+function courseInfoBody(course: CourseFields, semesterName: string, lang: Lang): string {
+	const t = makeT(lang);
 	return [
 		`# ${course.name}`,
 		'',
-		`- **Code:** ${course.code || '—'}`,
-		`- **Instructor:** ${course.instructor || '—'}`,
-		`- **Credits:** ${course.credits || '—'}`,
-		`- **Semester:** ${semesterName || '—'}`,
+		`- ${t('ci.code')} ${course.code || '—'}`,
+		`- ${t('ci.instructor')} ${course.instructor || '—'}`,
+		`- ${t('ci.credits')} ${course.credits || '—'}`,
+		`- ${t('ci.semester')} ${semesterName || '—'}`,
 		'',
-		'## Schedule',
+		t('ci.schedule'),
 		'',
-		'## Grading',
+		t('ci.grading'),
 		'',
-		'## Links',
+		t('ci.links'),
 		'',
 	].join('\n');
 }
 
-export function readingListBody(courseName: string, weeks: number): string {
+export function readingListBody(courseName: string, weeks: number, lang: Lang): string {
+	const t = makeT(lang);
 	const parts = [
-		`# ${courseName} — Reading List`,
+		`# ${courseName} ${t('rl.headingSuffix')}`,
 		'',
-		'Tick items as you read them — progress shows up on the Uni dashboard. Add items via the command palette (Ctrl+Shift+P, "Uni: Add reading…"), or type them directly as Markdown checkboxes.',
+		t('rl.hint'),
 	];
 	for (let w = 1; w <= weeks; w++) {
-		parts.push('', `## Week ${w}`);
+		parts.push('', weekHeading(lang, w));
 	}
-	parts.push('', FURTHER_READING_HEADING, '');
+	parts.push('', furtherReadingHeading(lang), '');
 	return parts.join('\n');
 }
 
@@ -62,11 +64,11 @@ export async function createCourseStructure(
 ): Promise<Folder> {
 	const courseFolder = await getOrCreateFolder(uniFolderId, course.name);
 
-	await getOrCreateNote(courseFolder.id, COURSE_INFO_TITLE, courseInfoBody(course, settings.semesterName));
-	await getOrCreateNote(courseFolder.id, READING_LIST_TITLE, readingListBody(course.name, settings.semesterWeeks));
+	await getOrCreateAutoNote(courseFolder.id, 'courseInfo', courseInfoBody(course, settings.semesterName, settings.language), settings.language);
+	await getOrCreateAutoNote(courseFolder.id, 'readingList', readingListBody(course.name, settings.semesterWeeks, settings.language), settings.language);
 
-	const lecturesFolder = await getOrCreateFolder(courseFolder.id, LECTURES_FOLDER_TITLE);
-	await getOrCreateFolder(courseFolder.id, ASSIGNMENTS_FOLDER_TITLE);
+	const lecturesFolder = await getOrCreateAutoFolder(courseFolder.id, 'lecturesFolder', settings.language);
+	await getOrCreateAutoFolder(courseFolder.id, 'assignmentsFolder', settings.language);
 
 	if (weeklyLectureNotes) {
 		// Only create stubs when the Lectures notebook is still empty.
@@ -74,7 +76,7 @@ export async function createCourseStructure(
 		if (!existing.length) {
 			for (let w = 1; w <= settings.semesterWeeks; w++) {
 				const body = renderLectureBody(settings, course.name, w, '', '');
-				const title = `Week ${w}`;
+				const title = weekLabel(settings.language, w);
 				await createNote({ title, body, parent_id: lecturesFolder.id });
 			}
 		}
@@ -103,11 +105,14 @@ export async function runSetupWizard(): Promise<void> {
 		semesterName: settings.semesterName,
 		semesterStart: settings.semesterStart,
 		semesterWeeks: settings.semesterWeeks,
+		language: settings.language,
 	});
 	if (!form) return;
 
+	const t = makeT(form.language);
+
 	if (form.semesterStart && !isValidUserDate(form.semesterStart)) {
-		await joplin.views.dialogs.showMessageBox('Please enter the semester start as DD.MM.YYYY, for example 12.10.2026.');
+		await joplin.views.dialogs.showMessageBox(t('msg.datePattern'));
 		return;
 	}
 	const semesterStartIso = form.semesterStart ? (germanToIso(form.semesterStart) ?? '') : '';
@@ -116,6 +121,7 @@ export async function runSetupWizard(): Promise<void> {
 	await setUniSetting('semesterName', form.semesterName);
 	await setUniSetting('semesterStart', semesterStartIso);
 	await setUniSetting('semesterWeeks', form.semesterWeeks);
+	await setUniSetting('language', form.language);
 
 	const settingsNow = await getUniSettings();
 	const folders = await getAllFolders();
@@ -136,8 +142,8 @@ export async function runSetupWizard(): Promise<void> {
 	if (dashboardId) await joplin.commands.execute('openNote', dashboardId);
 
 	const summary = createdNotebook
-		? `Created notebook "${settingsNow.notebookName}" with ${parsedCourses.length} course(s).`
-		: `${parsedCourses.length ? `Added ${parsedCourses.length} course(s). ` : ''}Semester settings updated.`;
+		? t('toast.createdNotebook', { name: settingsNow.notebookName, count: parsedCourses.length })
+		: `${parsedCourses.length ? t('toast.addedCourses', { count: parsedCourses.length }) : ''}${t('toast.settingsUpdated')}`;
 	await toast(summary);
 }
 
@@ -147,15 +153,15 @@ export async function addCourse(): Promise<void> {
 	const uniFolder = await findUniFolder(settings, folders);
 	if (!uniFolder) {
 		await joplin.views.dialogs.showMessageBox(
-			`No "${settings.notebookName}" notebook found. Run Ctrl+Shift+P, then "Uni: Set up semester…" first.`,
+			makeT(settings.language)('err.noNotebookFirst', { name: settings.notebookName }),
 		);
 		return;
 	}
 
-	const form = await showAddCourseForm(settings.semesterWeeks);
+	const form = await showAddCourseForm(settings.semesterWeeks, settings.language);
 	if (!form) return;
 
 	await createCourseStructure(uniFolder.id, form, settings, false);
 	await refreshDashboard({ silent: true });
-	await toast(`Added course "${form.name}".`);
+	await toast(makeT(settings.language)('toast.addedCourse', { name: form.name }));
 }

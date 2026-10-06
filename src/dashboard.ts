@@ -1,5 +1,6 @@
 import joplin from 'api';
 import { DASHBOARD_MARKER } from './constants';
+import { makeT } from './i18n';
 import { getAllFolders, getFolderNotes, getNote } from './data';
 import {
 	currentSemesterWeek,
@@ -73,7 +74,7 @@ export async function refreshDashboard(options: { silent?: boolean } = {}): Prom
 	if (!uniFolder) {
 		if (!silent) {
 			await joplin.views.dialogs.showMessageBox(
-				`No "${settings.notebookName}" notebook found. Run Ctrl+Shift+P, then **Uni: Set up semester…** to create it.`,
+				makeT(settings.language)('err.noNotebookCreate', { name: settings.notebookName }),
 			);
 		}
 		return null;
@@ -168,33 +169,31 @@ interface DashboardContext {
 
 function buildDashboardBody(ctx: DashboardContext): string {
 	const { settings, courses } = ctx;
+	const t = makeT(settings.language);
 	const lines: string[] = [];
 
 	lines.push(DASHBOARD_MARKER, '');
 
-	lines.push('# Uni Dashboard', '');
+	lines.push(`# ${settings.dashboardTitle}`, '');
 
 	// --- Semester header ---
 	const week = currentSemesterWeek(settings.semesterStart, settings.semesterWeeks);
 	if (settings.semesterName || week) {
 		const bits: string[] = [];
 		if (settings.semesterName) bits.push(`**${settings.semesterName}**`);
-		if (week) bits.push(`Week **${week}** of ${settings.semesterWeeks}`);
+		if (week) bits.push(t('dash.weekOf', { week: `**${week}**`, weeks: settings.semesterWeeks }));
 		bits.push(formatDate(Date.now()));
 		lines.push(bits.join(' · '), '');
 	} else {
-		lines.push(
-			`*Set your semester start under Options → Uni (or run the setup wizard) to see the current week here.*`,
-			'',
-		);
+		lines.push(t('dash.noSemester'), '');
 	}
 
 	// --- Courses table ---
-	lines.push('## Courses', '');
+	lines.push(t('dash.courses'), '');
 	if (!courses.length) {
-		lines.push('No courses yet — use the command palette (Ctrl+Shift+P, "Uni: Add course…").', '');
+		lines.push(t('dash.noCourses'), '');
 	} else {
-		lines.push('| Course | Readings | Open to-dos | Next deadline |', '| --- | --- | --- | --- |');
+		lines.push(t('dash.tableHead'), '| --- | --- | --- | --- |');
 		for (const course of courses) {
 			const reading = ctx.readingByCourse.get(course.folderId) ?? { total: 0, done: 0, nextUp: [] };
 			const readingCell = reading.total
@@ -214,23 +213,23 @@ function buildDashboardBody(ctx: DashboardContext): string {
 	}
 
 	// --- Deadlines ---
-	lines.push('## Deadlines', '');
+	lines.push(t('dash.deadlines'), '');
 	if (ctx.overdue.length) {
-		lines.push('**Overdue**', '');
+		lines.push(t('dash.overdue'), '');
 		for (const n of ctx.overdue) {
-			lines.push(`- [${n.title}](:/${n.id}) — due ${formatDate(n.todo_due)}, ${relativeDueLabel(n.todo_due)}${courseSuffix(ctx, n)}`);
+			lines.push(`- [${n.title}](:/${n.id}) — ${t('dash.dueWord', { date: formatDate(n.todo_due) })}, ${relativeDueLabel(n.todo_due, settings.language)}${courseSuffix(ctx, n)}`);
 		}
 		lines.push('');
 	}
 	if (ctx.upcoming.length) {
-		lines.push('**Next 14 days**', '');
+		lines.push(t('dash.next14'), '');
 		for (const n of ctx.upcoming) {
-			lines.push(`- [${n.title}](:/${n.id}) — due ${formatDate(n.todo_due)}, ${relativeDueLabel(n.todo_due)}${courseSuffix(ctx, n)}`);
+			lines.push(`- [${n.title}](:/${n.id}) — ${t('dash.dueWord', { date: formatDate(n.todo_due) })}, ${relativeDueLabel(n.todo_due, settings.language)}${courseSuffix(ctx, n)}`);
 		}
 		lines.push('');
 	}
 	if (!ctx.overdue.length && !ctx.upcoming.length) {
-		lines.push('Nothing due in the next 14 days. Add deadlines via the command palette (Ctrl+Shift+P, "Uni: Add deadline…").', '');
+		lines.push(t('dash.noDeadlines'), '');
 	}
 
 	// --- Reading next up ---
@@ -239,11 +238,11 @@ function buildDashboardBody(ctx: DashboardContext): string {
 		return r && r.nextUp.length;
 	});
 	if (withReadings.length) {
-		lines.push('## Reading next up', '');
+		lines.push(t('dash.readingNext'), '');
 		for (const course of withReadings) {
 			const r = ctx.readingByCourse.get(course.folderId)!;
 			const bar = progressBar(r.done, r.total);
-			lines.push(`### ${course.name} — ${r.done}/${r.total} read`, '', `\`${bar}\``, '');
+			lines.push(`### ${course.name} — ${t('dash.readProgress', { done: r.done, total: r.total })}`, '', `\`${bar}\``, '');
 			for (const item of r.nextUp) {
 				lines.push(`- ${item}`);
 			}
@@ -257,9 +256,9 @@ function buildDashboardBody(ctx: DashboardContext): string {
 		.sort((a, b) => b.updated_time - a.updated_time)
 		.slice(0, 5);
 	if (recent.length) {
-		lines.push('## Recently updated', '');
+		lines.push(t('dash.recent'), '');
 		for (const n of recent) {
-			lines.push(`- [${n.title}](:/${n.id}) — ${relativeUpdatedLabel(n.updated_time)}${courseSuffix(ctx, n)}`);
+			lines.push(`- [${n.title}](:/${n.id}) — ${relativeUpdatedLabel(n.updated_time, settings.language)}${courseSuffix(ctx, n)}`);
 		}
 		lines.push('');
 	}
@@ -267,7 +266,7 @@ function buildDashboardBody(ctx: DashboardContext): string {
 	// --- Footer ---
 	lines.push('---', '');
 	lines.push(
-		`*Generated by the Uni plugin — edits are overwritten on refresh. Refresh via Ctrl+Shift+P, "Uni: Refresh dashboard". Last updated ${new Date().toLocaleString()}.*`,
+		t('dash.footer', { time: new Date().toLocaleString() }),
 		'',
 	);
 

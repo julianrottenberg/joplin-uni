@@ -80,6 +80,11 @@ export async function updateNote(noteId: string, properties: Record<string, any>
 	await joplin.data.put(['notes', noteId], null, properties);
 }
 
+/** Rename a folder (PUT /folders/:id). */
+export async function updateFolder(folderId: string, properties: Record<string, any>): Promise<void> {
+	await joplin.data.put(['folders', folderId], null, properties);
+}
+
 /** Find-or-create a tag by title; returns the tag id. */
 export async function findOrCreateTag(title: string): Promise<string> {
 	let page = 1;
