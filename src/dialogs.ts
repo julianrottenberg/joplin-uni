@@ -56,7 +56,7 @@ function pageHtml(title: string, hint: string, formHtml: string, tall: boolean):
 	<div class="sheet ${tall ? 'tall' : 'short'}">
 		<h3>${escapeHtml(title)}</h3>
 		<p class="hint">${hint}</p>
-		<form>${formHtml}</form>
+		<form name="uniForm">${formHtml}</form>
 	</div>
 	</body></html>`;
 }
@@ -68,6 +68,25 @@ export function escapeHtml(s: string): string {
 		.replace(/>/g, '&gt;')
 		.replace(/"/g, '&quot;')
 		.replace(/'/g, '&#39;');
+}
+
+/**
+ * Joplin nests dialog form values under each form's name attribute:
+ * `{ [formName]: { field: value } }` — an unnamed form lands under the
+ * literal key "null" (see serializeForms in UserWebviewIndex.js in the
+ * Joplin repo). This unwraps that shape; flat values are passed through.
+ */
+export function unwrapFormData(raw: Record<string, any> | null | undefined): Record<string, any> {
+	if (!raw || typeof raw !== 'object') return {};
+	const keys = Object.keys(raw);
+	const nested = keys.length > 0 && keys.every((k) => {
+		const value = raw[k];
+		return !!value && typeof value === 'object' && !Array.isArray(value);
+	});
+	if (!nested) return raw as Record<string, any>;
+	const merged: Record<string, any> = {};
+	for (const k of keys) Object.assign(merged, raw[k]);
+	return merged;
 }
 
 const dialogHandles = new Map<string, string>();
@@ -97,7 +116,7 @@ export async function openFormDialog(
 	// Fixed-size sheet: Joplin's auto-sizing mismeasures on HiDPI screens.
 	await joplin.views.dialogs.setFitToContent(handle, false);
 	const result = await joplin.views.dialogs.open(handle);
-	if (result.id === 'ok') return result.formData ?? {};
+	if (result.id === 'ok') return unwrapFormData(result.formData);
 	return null;
 }
 
@@ -233,7 +252,10 @@ export async function showAddCourseForm(semesterWeeks: number): Promise<CourseFi
 	);
 	if (!data) return null;
 	const name = (data.name || '').trim();
-	if (!name) return null;
+	if (!name) {
+		await joplin.views.dialogs.showMessageBox('Please enter a course name.');
+		return null;
+	}
 	return {
 		name,
 		code: (data.code || '').trim(),
@@ -272,12 +294,17 @@ export async function showLectureForm(courses: Course[], defaultWeek: number | n
 		'Create note',
 	);
 	if (!data) return null;
+	const topic = (data.topic || '').trim();
+	if (!topic) {
+		await joplin.views.dialogs.showMessageBox('Please enter a topic.');
+		return null;
+	}
 	const week = Number(data.week);
 	return {
 		courseId: data.course,
 		week: Number.isFinite(week) && week > 0 ? week : 1,
 		date: (data.date || '').trim(),
-		topic: (data.topic || '').trim(),
+		topic,
 	};
 }
 
@@ -315,7 +342,10 @@ export async function showReadingForm(courses: Course[], defaultWeek: number | n
 	);
 	if (!data) return null;
 	const text = (data.text || '').trim();
-	if (!text) return null;
+	if (!text) {
+		await joplin.views.dialogs.showMessageBox('Please enter a reading.');
+		return null;
+	}
 	const week = Number(data.week);
 	return {
 		courseId: data.course,
@@ -358,7 +388,10 @@ export async function showDeadlineForm(courses: Course[]): Promise<DeadlineFormR
 	if (!data) return null;
 	const title = (data.title || '').trim();
 	const due = (data.due || '').trim();
-	if (!title || !due) return null;
+	if (!title || !due) {
+		await joplin.views.dialogs.showMessageBox('Please enter a title and a due date.');
+		return null;
+	}
 	return {
 		courseId: data.course,
 		type: data.type || 'Assignment',

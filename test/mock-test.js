@@ -19,7 +19,7 @@ const store = {
 const executed = [];
 const toasts = [];
 const messages = [];
-const dialogQueue = []; // form data objects, consumed FIFO
+const dialogQueue = []; // field objects, consumed FIFO; the mock nests them under the form name like real Joplin. {__raw: x} sends x as-is.
 const dialogsCreated = [];
 
 function paginate(items, query) {
@@ -71,8 +71,13 @@ const joplin = {
 			async setButtons() {},
 			async setFitToContent() {},
 			async open() {
-				const fd = dialogQueue.shift();
+				let fd = dialogQueue.shift();
 				if (fd === undefined) throw new Error('dialogQueue empty — test forgot to queue form data');
+				// Real Joplin nests the fields under the form's name:
+				// { [formName]: { field: value } }. An unnamed form lands
+				// under the literal key "null". Mimic that here.
+				if (fd && fd.__raw !== undefined) fd = fd.__raw;
+				else fd = { uniForm: fd };
 				return { id: 'ok', formData: fd };
 			},
 			async showMessageBox(message) {
@@ -261,6 +266,15 @@ async function main() {
 		check('dashboard links course info', dashboard.body.includes(`[Epistemology](:/${epiNotes.find((n) => n.title === 'Course Info').id})`));
 		check('dashboard has 3 courses', (dashboard.body.match(/\|\s*\[?Französisch/g) || []).length === 1 && dashboard.body.includes('Linear Algebra'));
 	}
+
+	// --- 7. Regression: Joplin's nested form data must be unwrapped ---
+	// Reading fields flat used to make every lookup come back undefined,
+	// so no course was created (the user-visible bug). This is the exact
+	// shape an unnamed <form> produces in real Joplin.
+	dialogQueue.push({ __raw: { null: { name: 'Statistik', code: 'STA-201', instructor: 'Prof. Gauss', credits: '5' } } });
+	await joplin.commands.execute('uni.addCourse');
+	const sta = folderByTitle('Statistik', uni.id);
+	check('nested form data unwrapped (course created)', !!sta && notesInFolder(sta.id).some((n) => n.title === 'Course Info'));
 
 	console.log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : failures + ' CHECK(S) FAILED'}`);
 	return failures === 0;

@@ -8,6 +8,23 @@ import { newLectureNote, addReading, addDeadline } from './actions';
 import { findDashboardNote, findUniFolder } from './uni';
 import { getAllFolders } from './data';
 
+/**
+ * Wraps a command so that any failure surfaces as a dialog instead of the
+ * command silently doing nothing — the plugin's worst failure mode.
+ */
+function runCommand(execute: () => Promise<void>): () => Promise<void> {
+	return async () => {
+		try {
+			await execute();
+		} catch (error) {
+			console.error('uni: command failed', error);
+			await joplin.views.dialogs.showMessageBox(
+				`Uni plugin: something went wrong.\n\n${error instanceof Error ? error.message : String(error)}`,
+			);
+		}
+	};
+}
+
 async function refreshDashboardCommand(): Promise<void> {
 	const id = await refreshDashboard();
 	if (id) {
@@ -44,37 +61,37 @@ async function registerCommands(): Promise<void> {
 	await joplin.commands.register({
 		name: CMD.setup,
 		label: 'Uni: Set up semester…',
-		execute: runSetupWizard,
+		execute: runCommand(runSetupWizard),
 	});
 	await joplin.commands.register({
 		name: CMD.addCourse,
 		label: 'Uni: Add course…',
-		execute: addCourse,
+		execute: runCommand(addCourse),
 	});
 	await joplin.commands.register({
 		name: CMD.newLectureNote,
 		label: 'Uni: New lecture note…',
-		execute: newLectureNote,
+		execute: runCommand(newLectureNote),
 	});
 	await joplin.commands.register({
 		name: CMD.addReading,
 		label: 'Uni: Add reading…',
-		execute: addReading,
+		execute: runCommand(addReading),
 	});
 	await joplin.commands.register({
 		name: CMD.addDeadline,
 		label: 'Uni: Add deadline…',
-		execute: addDeadline,
+		execute: runCommand(addDeadline),
 	});
 	await joplin.commands.register({
 		name: CMD.refreshDashboard,
 		label: 'Uni: Refresh dashboard',
-		execute: refreshDashboardCommand,
+		execute: runCommand(refreshDashboardCommand),
 	});
 	await joplin.commands.register({
 		name: CMD.openDashboard,
 		label: 'Uni: Open dashboard',
-		execute: openDashboard,
+		execute: runCommand(openDashboard),
 	});
 }
 
