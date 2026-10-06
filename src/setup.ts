@@ -21,13 +21,15 @@ async function toast(message: string, type: ToastType = ToastType.Success): Prom
 }
 
 function courseInfoBody(course: CourseFields, semesterName: string, lang: Lang): string {
-	return renderCourseInfoBlock(course.name, {
+	const t = makeT(lang);
+	const block = renderCourseInfoBlock(course.name, {
 		...emptyCourseDetails(),
 		code: course.code,
 		instructor: course.instructor,
 		ects: course.credits,
 		semester: semesterName,
 	}, lang);
+	return `${block}\n\n${t('ci.schedule')}\n\n${t('ci.grading')}\n\n${t('ci.links')}\n`;
 }
 
 export function readingListBody(courseName: string, weeks: number, lang: Lang): string {
