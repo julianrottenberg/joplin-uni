@@ -47,6 +47,10 @@ const STRINGS = {
 	'setup.example.name': { en: 'e.g. Epistemology', de: 'z. B. Erkenntnistheorie' },
 	'setup.example.instructor': { en: 'Dr. Smith', de: 'Prof. Schmidt' },
 	'setup.weeklyNotes': { en: 'Create a lecture note for every week', de: 'Für jede Woche eine Vorlesungsnotiz anlegen' },
+	'setup.partsHint': {
+		en: 'Lectures, exercises, seminars? Add them as parts of the module later via "Uni: Add part…" — credits count once per module.',
+		de: 'Vorlesung, Übung, Seminar? Leg sie später als Teile des Moduls an, mit „Uni: Modul-Teil hinzufügen…" — ECTS zählen einmal pro Modul.',
+	},
 	'setup.create': { en: 'Create', de: 'Erstellen' },
 	'setup.aria.name': { en: 'Course {i} name', de: 'Kurs {i}: Name' },
 	'setup.aria.code': { en: 'Course {i} code', de: 'Kurs {i}: Nummer' },
@@ -70,11 +74,25 @@ const STRINGS = {
 	'addCourse.button': { en: 'Add course', de: 'Kurs hinzufügen' },
 	'msg.enterCourseName': { en: 'Please enter a course name.', de: 'Bitte gib einen Kursnamen ein.' },
 
+	// --- Add part (Vorlesung, Übung, Seminar…) ---
+	'part.title': { en: 'Add a module part', de: 'Modul-Teil hinzufügen' },
+	'part.hint': {
+		en: 'Creates a sub-notebook inside the course notebook, e.g. for a lecture, exercise or seminar. Credits and the reading list stay at module level.',
+		de: 'Legt ein Unter-Notizbuch im Kurs-Notizbuch an, z. B. für Vorlesung, Übung oder Seminar. ECTS und Literaturliste bleiben beim Modul.',
+	},
+	'part.name': { en: 'Part name', de: 'Name des Teils' },
+	'part.namePh': { en: 'e.g. Exercise, Seminar', de: 'z. B. Übung, Seminar' },
+	'part.weeklyStubs': { en: 'Create a note for every week', de: 'Für jede Woche eine Notiz anlegen' },
+	'part.button': { en: 'Create part', de: 'Teil anlegen' },
+	'msg.enterPartName': { en: 'Please enter a part name.', de: 'Bitte gib einen Namen für den Teil ein.' },
+	'toast.partCreated': { en: 'Created part "{name}" in {course}.', de: 'Teil „{name}" in {course} angelegt.' },
+	'toast.partExists': { en: 'Part "{name}" already exists in {course}.', de: 'Teil „{name}" existiert bereits in {course}.' },
+
 	// --- Lecture note ---
 	'lecture.title': { en: 'New lecture note', de: 'Neue Vorlesungsnotiz' },
 	'lecture.hint': {
-		en: 'Creates a lecture note in the course\'s "Lectures" notebook.',
-		de: 'Legt eine Vorlesungsnotiz im Ordner „Vorlesungen" des Kurses an.',
+		en: 'Creates a note in the course\'s "Lectures" notebook, or in the selected part (e.g. Übung, Seminar).',
+		de: 'Legt eine Notiz im Ordner „Vorlesungen" des Kurses an — oder im gewählten Teil (z. B. Übung, Seminar).',
 	},
 	'lecture.course': { en: 'Course', de: 'Kurs' },
 	'lecture.week': { en: 'Week', de: 'Woche' },
@@ -349,6 +367,7 @@ export const DEADLINE_TYPES: Record<Lang, readonly string[]> = {
 export const COMMAND_LABELS: Record<string, Record<Lang, string>> = {
 	'uni.setup': { en: 'Uni: Set up semester…', de: 'Uni: Semester einrichten…' },
 	'uni.addCourse': { en: 'Uni: Add course…', de: 'Uni: Kurs hinzufügen…' },
+	'uni.addPart': { en: 'Uni: Add part…', de: 'Uni: Modul-Teil hinzufügen…' },
 	'uni.newLectureNote': { en: 'Uni: New lecture note…', de: 'Uni: Neue Vorlesungsnotiz…' },
 	'uni.addReading': { en: 'Uni: Add reading…', de: 'Uni: Lesetext hinzufügen…' },
 	'uni.addDeadline': { en: 'Uni: Add deadline…', de: 'Uni: Frist hinzufügen…' },

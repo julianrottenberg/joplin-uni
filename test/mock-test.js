@@ -182,7 +182,7 @@ async function main() {
 	check('plugin registered', !!plugin && typeof plugin.onStart === 'function');
 
 	await plugin.onStart();
-	check('commands registered', Object.keys(joplin.commands._cmds).length === 7);
+	check('commands registered', Object.keys(joplin.commands._cmds).length === 8);
 
 	// --- 1. Setup wizard ---
 	dialogQueue.push({
@@ -281,6 +281,29 @@ async function main() {
 	const sta = folderByTitle('Statistik', uni.id);
 	check('nested form data unwrapped (course created)', !!sta && notesInFolder(sta.id).some((n) => n.title === 'Course Info'));
 
+	// --- 7b. Parts (Übung/Seminar sub-notebooks of a course) ---
+	dialogQueue.push({ course: epi.id, name: 'Übung', weeklyStubs: 'on' });
+	await joplin.commands.execute('uni.addPart');
+	const uebung = folderByTitle('Übung', epi.id);
+	const uebNotes = uebung ? notesInFolder(uebung.id) : [];
+	check('part folder created', !!uebung);
+	check('part weekly stubs (3)', uebNotes.length === 3 && uebNotes.every((n) => /Week \d/.test(n.title)));
+
+	// Same name twice -> toast, still one folder.
+	dialogQueue.push({ course: epi.id, name: 'Übung' });
+	await joplin.commands.execute('uni.addPart');
+	check('duplicate part rejected', [...store.folders.values()].filter((f) => f.title === 'Übung' && f.parent_id === epi.id).length === 1);
+
+	// courseId|partId routes the lecture note into the part.
+	dialogQueue.push({ course: `${epi.id}|${uebung ? uebung.id : ''}`, week: 1, date: '05.10.2026', topic: 'Blatt 1' });
+	await joplin.commands.execute('uni.newLectureNote');
+	check('lecture routed into part', notesInFolder(uebung ? uebung.id : '').some((n) => n.title === 'Week 1 — Blatt 1'));
+
+	// Plain course id (no part) still lands in the Lectures folder.
+	dialogQueue.push({ course: epi.id, week: 2, date: '13.10.2026', topic: 'Agreement cases' });
+	await joplin.commands.execute('uni.newLectureNote');
+	check('legacy course id -> Lectures', notesInFolder(lectures.id).some((n) => n.title === 'Week 2 — Agreement cases'));
+
 	// --- 8. German language scenario ---
 	// The wizard's language selector must switch every created item;
 	// the mock locale above stays en_US, so only the form choice can do it.
@@ -309,6 +332,10 @@ async function main() {
 	await joplin.commands.execute('uni.refreshDashboard');
 	const deDashboard = notesInFolder(deUni.id).find((n) => n.body.includes('uni-dashboard'));
 	check('German dashboard headings', !!deDashboard && deDashboard.body.includes('## Kurse') && deDashboard.body.includes('## Fristen'));
+
+	dialogQueue.push({ course: deCourse.id, name: 'Seminar' });
+	await joplin.commands.execute('uni.addPart');
+	check('German part created', folderByTitle('Seminar', deCourse.id) !== null);
 	console.log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : failures + ' CHECK(S) FAILED'}`);
 	return failures === 0;
 }

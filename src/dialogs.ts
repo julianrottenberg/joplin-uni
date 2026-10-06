@@ -1,6 +1,7 @@
 import joplin from 'api';
 import type { Course, CourseFields } from './uni';
 import {
+	autoTitle,
 	DEADLINE_TYPES,
 	isLang,
 	LANG_LABELS,
@@ -140,6 +141,24 @@ function courseSelect(courses: Course[], selected?: string): string {
 	return `<select name="course">${options}</select>`;
 }
 
+/**
+ * Grouped select for the lecture form: one optgroup per course, with the
+ * module's Lectures notebook first and every part below it.
+ * Value format: `${courseId}|${partId}` (empty partId = Lectures folder).
+ */
+function coursePartSelect(courses: Course[], lang: Lang): string {
+	const groups = courses
+		.map((c) => {
+			const options = [
+				`<option value="${c.folderId}|">${escapeHtml(autoTitle('lecturesFolder', lang))}</option>`,
+				...c.parts.map((p) => `<option value="${c.folderId}|${p.id}">${escapeHtml(p.name)}</option>`),
+			].join('');
+			return `<optgroup label="${escapeHtml(c.name)}">${options}</optgroup>`;
+		})
+		.join('');
+	return `<select name="course">${groups}</select>`;
+}
+
 // ---------------------------------------------------------------------------
 // Forms
 // ---------------------------------------------------------------------------
@@ -215,6 +234,7 @@ export async function showSetupForm(defaults: {
 			</label>
 		</div>
 		${courseFieldsHtml(t)}
+		<p class="hint">${t('setup.partsHint')}</p>
 		<label class="check"><input type="checkbox" name="weeklyLectureNotes"> ${t('setup.weeklyNotes')}</label>
 	`;
 	const data = await openFormDialog(
@@ -292,9 +312,48 @@ export async function showAddCourseForm(semesterWeeks: number, lang: Lang): Prom
 	};
 }
 
+export interface AddPartFormResult {
+	courseId: string;
+	name: string;
+	weeklyStubs: boolean;
+}
+
+export async function showAddPartForm(courses: Course[], lang: Lang): Promise<AddPartFormResult | null> {
+	const t = makeT(lang);
+	const form = `
+		<label>${t('lecture.course')} ${courseSelect(courses)}</label>
+		<label>${t('part.name')}
+			<input type="text" name="name" placeholder="${escapeHtml(t('part.namePh'))}" required>
+		</label>
+		<label class="check"><input type="checkbox" name="weeklyStubs"> ${t('part.weeklyStubs')}</label>
+	`;
+	const data = await openFormDialog(
+		'uni-add-part',
+		t('part.title'),
+		t('part.hint'),
+		form,
+		t('part.button'),
+		false,
+		t('btn.cancel'),
+	);
+	if (!data) return null;
+
+	const name = (data.name || '').trim();
+	if (!name) {
+		await joplin.views.dialogs.showMessageBox(t('msg.enterPartName'));
+		return null;
+	}
+	return {
+		courseId: data.course,
+		name,
+		weeklyStubs: data.weeklyStubs === 'on',
+	};
+}
+
 export interface LectureFormResult {
 	courseId: string;
 	week: number;
+	partId: string;
 	date: string;
 	topic: string;
 }
@@ -302,7 +361,7 @@ export interface LectureFormResult {
 export async function showLectureForm(courses: Course[], defaultWeek: number | null, lang: Lang): Promise<LectureFormResult | null> {
 	const t = makeT(lang);
 	const form = `
-		<label>${t('lecture.course')} ${courseSelect(courses)}</label>
+		<label>${t('lecture.course')} ${coursePartSelect(courses, lang)}</label>
 		<div class="row">
 			<label>${t('lecture.week')}
 				<input type="number" name="week" min="1" max="40" value="${defaultWeek ?? 1}" required>
@@ -331,8 +390,10 @@ export async function showLectureForm(courses: Course[], defaultWeek: number | n
 		return null;
 	}
 	const week = Number(data.week);
+	const [courseId, partId = ''] = String(data.course || '').split('|');
 	return {
-		courseId: data.course,
+		courseId,
+		partId,
 		week: Number.isFinite(week) && week > 0 ? week : 1,
 		date: (data.date || '').trim(),
 		topic,

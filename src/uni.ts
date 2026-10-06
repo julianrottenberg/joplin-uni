@@ -20,6 +20,14 @@ export interface Course {
 	readingNoteId: string | null;
 	lecturesFolderId: string | null;
 	assignmentsFolderId: string | null;
+	/** User-created sub-notebooks (parts), e.g. Vorlesung, Übung, Seminar. */
+	parts: Part[];
+}
+
+/** A user-created sub-notebook of a course (e.g. Vorlesung, Übung, Seminar). */
+export interface Part {
+	id: string;
+	name: string;
 }
 
 /**
@@ -95,6 +103,10 @@ export async function loadCourses(uniFolderId: string, folders: Folder[]): Promi
 			readingNoteId: notes.find((n: any) => autoAliases('readingList').includes(n.title))?.id ?? null,
 			lecturesFolderId: childFolders.find((f) => autoAliases('lecturesFolder').includes(f.title))?.id ?? null,
 			assignmentsFolderId: childFolders.find((f) => autoAliases('assignmentsFolder').includes(f.title))?.id ?? null,
+			parts: childFolders
+				.filter((f) => !autoFolderTitleAliases().includes(f.title))
+				.map((f) => ({ id: f.id, name: f.title }))
+				.sort((a, b) => a.name.localeCompare(b.name)),
 		});
 	}
 	return out;

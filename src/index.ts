@@ -4,7 +4,7 @@ import { CMD } from './constants';
 import { getUniSettings, registerUniSettings, startupLanguage } from './settings';
 import { refreshDashboard } from './dashboard';
 import { runSetupWizard, addCourse } from './setup';
-import { newLectureNote, addReading, addDeadline } from './actions';
+import { addDeadline, addPart, addReading, newLectureNote } from './actions';
 import { findDashboardNote, findUniFolder } from './uni';
 import { getAllFolders } from './data';
 import { commandLabel, makeT } from './i18n';
@@ -68,6 +68,11 @@ async function registerCommands(lang: Lang): Promise<void> {
 		name: CMD.addCourse,
 		label: commandLabel(CMD.addCourse, lang),
 		execute: runCommand(t, addCourse),
+	});
+	await joplin.commands.register({
+		name: CMD.addPart,
+		label: commandLabel(CMD.addPart, lang),
+		execute: runCommand(t, addPart),
 	});
 	await joplin.commands.register({
 		name: CMD.newLectureNote,

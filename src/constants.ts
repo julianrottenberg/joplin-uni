@@ -12,6 +12,7 @@ export const DEADLINE_TAG = 'uni/deadline';
 export const CMD = {
 	setup: 'uni.setup',
 	addCourse: 'uni.addCourse',
+	addPart: 'uni.addPart',
 	newLectureNote: 'uni.newLectureNote',
 	addReading: 'uni.addReading',
 	addDeadline: 'uni.addDeadline',

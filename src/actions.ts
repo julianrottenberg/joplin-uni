@@ -10,9 +10,9 @@ import {
 	weekLabel,
 } from './i18n';
 import type { Lang } from './i18n';
-import { attachTagToNote, createNote, findOrCreateTag, getAllFolders, updateNote } from './data';
+import { attachTagToNote, createFolder, createNote, findOrCreateTag, getAllFolders, updateNote } from './data';
 import { currentSemesterWeek, dateInputToMs } from './dates';
-import { showDeadlineForm, showLectureForm, showReadingForm } from './dialogs';
+import { showAddPartForm, showDeadlineForm, showLectureForm, showReadingForm } from './dialogs';
 import { getUniSettings } from './settings';
 import { findUniFolder, getOrCreateAutoFolder, getOrCreateAutoNote, loadCourses } from './uni';
 import { readingListBody, renderLectureBody } from './setup';
@@ -52,18 +52,51 @@ export async function newLectureNote(): Promise<void> {
 	if (!form) return;
 
 	const course = ctx.courses.find((c) => c.folderId === form.courseId) ?? ctx.courses[0];
-	const lecturesFolder = await getOrCreateAutoFolder(course.folderId, 'lecturesFolder', ctx.settings.language);
+	// A part (Übung, Seminar…) wins over the module's Lectures folder.
+	const part = course.parts.find((p) => p.id === form.partId);
+	const destinationId = part
+		? part.id
+		: (await getOrCreateAutoFolder(course.folderId, 'lecturesFolder', ctx.settings.language)).id;
 
 	const body = renderLectureBody(ctx.settings, course.name, form.week, form.date, form.topic);
 	const note = await createNote({
 		title: `${weekLabel(ctx.settings.language, form.week)} — ${form.topic}`,
 		body,
-		parent_id: lecturesFolder.id,
+		parent_id: destinationId,
 	});
 
 	await refreshDashboard({ silent: true });
 	await joplin.commands.execute('openNote', note.id);
-	await toast(t('toast.lectureCreated', { course: course.name }));
+	await toast(t('toast.lectureCreated', { course: part ? `${course.name} — ${part.name}` : course.name }));
+}
+
+export async function addPart(): Promise<void> {
+	const ctx = await requireWorkspace();
+	if (!ctx) return;
+	const t = makeT(ctx.settings.language);
+
+	const form = await showAddPartForm(ctx.courses, ctx.settings.language);
+	if (!form) return;
+
+	const course = ctx.courses.find((c) => c.folderId === form.courseId) ?? ctx.courses[0];
+	if (course.parts.some((p) => p.name === form.name)) {
+		await toast(t('toast.partExists', { course: course.name, name: form.name }));
+		return;
+	}
+
+	const folder = await createFolder(form.name, course.folderId);
+	if (form.weeklyStubs) {
+		for (let w = 1; w <= ctx.settings.semesterWeeks; w++) {
+			await createNote({
+				title: weekLabel(ctx.settings.language, w),
+				body: renderLectureBody(ctx.settings, course.name, w, '', ''),
+				parent_id: folder.id,
+			});
+		}
+	}
+
+	await refreshDashboard({ silent: true });
+	await toast(t('toast.partCreated', { course: course.name, name: form.name }));
 }
 
 /** Insert a reading item under its week heading (or Further reading). */
